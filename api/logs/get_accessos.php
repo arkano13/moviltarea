@@ -52,12 +52,11 @@ $sql = "select
 m.modulo_codigo,
 m.modulo_nombre,
 m.modulo_nombre as modulo_descripcion,
-m.modulo_activity,
-m.modulo_screen
+m.modulo_activity
 from
 tbl_acceso ac 
 inner join tbl_modulo m on ac.modulo_codigo=m.modulo_codigo
-where ac.usuario_id=".$usuario_id."
+where ac.usuario_id=?
 and acceso_estado=1 and m.modulo_tipo='MODULO'";
 
 $conexion = Database::getInstance();
@@ -78,7 +77,7 @@ if (!$stmt)
         'error' => $conexion->error
     ]);
     $conexion->close();
-    exit();
+    //exit();
 }
 
 // Vincular parámetros (ss = dos strings)
@@ -95,7 +94,7 @@ if (!$stmt->execute())
     ]);
     $stmt->close();
     $conexion->close();
-    exit();
+    //exit();
 }
 
 // Obtener resultados
