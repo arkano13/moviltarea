@@ -1,9 +1,12 @@
 <?php
-//Agregar en api/logs/consultarBitacora.php
-header('Content-Type: application/json; charset=utf-8'); // 👈 Clave: declarar UTF-8
-// 3️⃣ Conectar a la BD
-require_once '../../config/database.php';
-require_once '../../config/cors.php';
+
+
+require_once __DIR__ . '/../config/cors.php';
+require_once __DIR__ . '/../config/database.php';
+header("Access-Control-Allow-Origin: http://localhost:8081");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
 
 // Capturar errores fatales
 error_reporting(E_ALL);

@@ -1,9 +1,8 @@
 <?php
 //htdocs/movil/core/Logger.php (Carpeta core queda a lado de api)
-header('Content-Type: application/json; charset=utf-8'); // 👈 Clave: declarar UTF-8
-require_once '../config/database.php';
 require_once '../config/cors.php';
-
+header('Content-Type: application/json; charset=utf-8');
+require_once '../config/database.php';
 
 //Respuestas con Detalles de Errores para Depuración
 function responder($exito, $mensaje, $datos_extra = [], $codigo_http = 200) 

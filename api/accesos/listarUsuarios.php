@@ -22,11 +22,17 @@ try {
         throw new Exception('No se pudo conectar a la base de datos.');
     }
 
-    $resultado = mysqli_query($conexion, "
-        SELECT usuario_id, usuario_nombre, usuario_nombrecomp
-        FROM tbl_usuario
-        ORDER BY usuario_nombrecomp ASC
-    ");
+  $resultado = mysqli_query($conexion, "
+    SELECT
+        usuario_id,
+        usuario_nombre,
+        usuario_nombrecomp,
+        usuario_correo,
+        usuario_telefono,
+        empresa_id
+    FROM tbl_usuario
+    ORDER BY usuario_id ASC
+");
 
     if (!$resultado) {
         throw new Exception('Error en la consulta: ' . mysqli_error($conexion));
