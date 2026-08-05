@@ -1,11 +1,10 @@
 <?php
-
-ob_start();
-
-require_once '../../config/cors.php';
-header('Content-Type: application/json; charset=utf-8');
-require_once '../../config/database.php';
-
+header('Content-Type: application/json; charset=utf-8'); // 👈 Clave: declarar UTF-8
+// 3️⃣ Conectar a la BD
+    require_once '../../config/database.php';
+    require_once '../../config/cors.php';
+    
+// Capturar errores fatales
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
@@ -14,7 +13,6 @@ register_shutdown_function(function()
     $error = error_get_last();
     if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) 
     {
-        ob_clean();
         http_response_code(500);
         echo json_encode([
             'exito' => false,
@@ -26,34 +24,20 @@ register_shutdown_function(function()
 
 try 
 {
-    // 1️⃣ Recibir datos - soporta JSON y FormData
+    // 1️⃣ Recibir datos JSON del body
     $inputRaw = file_get_contents('php://input');
-    $input = null;
+    $input = json_decode($inputRaw, true);
 
-    // Intentar JSON primero
-    if (!empty($inputRaw)) {
-        $input = json_decode($inputRaw, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $input = null;
-        }
+    if (!$input) 
+    {
+        throw new Exception('Datos inválidos. Se esperaba JSON.');
     }
 
-    // Si no hay JSON, intentar $_POST (FormData)
-    if (empty($input) && !empty($_POST)) {
-        $input = $_POST;
-    }
-
-    error_log("LOGIN RAW: [" . $inputRaw . "]");
-    error_log("LOGIN POST: [" . json_encode($_POST) . "]");
-    error_log("LOGIN INPUT FINAL: [" . json_encode($input) . "]");
-
-    if (empty($input)) {
-        throw new Exception('No se recibieron datos del cliente.');
-    }
-
-    $usuario    = trim($input['usuario_nombre'] ?? '');
-    $clave      = $input['usuario_clave'] ?? '';
-    $empresa_id = 0;
+    $usuario    = trim($input['user'] ?? '');
+    $clave      = $input['pass'] ?? '';
+    $empresa_id = 0;//$input['empresa_id'] ?? 0;
+    //$dispo_unique_id = $input['device_id'] ?? null;
+    //$ip_origen  = $_SERVER['REMOTE_ADDR'] ?? 'desconocida';
 
     // 2️⃣ Validar campos
     if (empty($usuario) || empty($clave)) 
@@ -61,7 +45,6 @@ try
         throw new Exception('Usuario y contraseña son obligatorios.');
     }
 
-    // 3️⃣ Conectar a la BD
     $conexion = Database::getInstance();
     
     if (!$conexion) 
@@ -72,15 +55,17 @@ try
     // 4️⃣ Buscar el usuario
     $stmt = mysqli_prepare($conexion, "
         SELECT 
-            usuario_id, 
+            tbl_usuario.usuario_id, 
             usuario_nombre, 
             usuario_clave, 
             usuario_nombrecomp, 
             usuario_correo,
             usuario_telefono,
-            empresa_id
+            empresa_id,
+            IFNULL(ui.usuario_img_ruta,'') AS ruta
         FROM tbl_usuario 
-        WHERE usuario_nombre = ? 
+        LEFT OUTER JOIN tbl_usuario_img ui ON ui.usuario_id = tbl_usuario.usuario_id
+        WHERE usuario_nombre = ?
           AND empresa_id = ?
         LIMIT 1
     ");
@@ -97,10 +82,14 @@ try
     mysqli_stmt_close($stmt);
 
     // 5️⃣ Validar credenciales
-    if (!$user || $clave != $user['usuario_clave']) 
+    if (!$user || $clave!=$user['usuario_clave']) 
     {
+        // ❌ LOGIN FALLIDO - Registrar en bitácora
+        /*registrarBitacora($conexion, null, $usuario, $dispo_unique_id, $ip_origen, 
+            'LOGIN_FALLIDO', 'tbl_usuario', null, 'FALLIDO', 
+            'Credenciales incorrectas para usuario: ' . $usuario);*/
+
         http_response_code(401);
-        ob_clean();
         echo json_encode([
             'exito' => false,
             'mensaje' => 'Usuario o contraseña incorrectos.'
@@ -118,24 +107,44 @@ try
     mysqli_stmt_execute($updateStmt);
     mysqli_stmt_close($updateStmt);
 
-    ob_clean();
     echo json_encode([
-        'exito' => true,
-        'mensaje' => 'Bienvenido, ' . $user['usuario_nombrecomp'],
-        'usuario' => [
-            'id'              => $user['usuario_id'],
-            'usuario'         => $user['usuario_nombre'],
-            'nombre_completo' => $user['usuario_nombrecomp'],
-            'correo'          => $user['usuario_correo'],
-            'telefono'        => $user['usuario_telefono'],
-            'empresa_id'      => $user['empresa_id']
-        ]
-    ], JSON_UNESCAPED_UNICODE);
+            'exito' => true,
+            'mensaje' => 'Bienvenido, ' . $user['usuario_nombrecomp'],
+            'usuario' => [
+                'id'              => $user['usuario_id'],
+                'usuario'         => $user['usuario_nombre'],
+                'nombre_completo' => $user['usuario_nombrecomp'],
+                'correo'          => $user['usuario_correo'],
+                'telefono'        => $user['usuario_telefono'],
+                'ruta'     => $user['ruta'] ?? null,
+                'empresa_id'      => $user['empresa_id']
+            ]
+        ], JSON_UNESCAPED_UNICODE);
 
+    /*if($dispo_unique_id!="")
+    {
+    // 7️⃣ Registrar en bitácora
+        registrarBitacora($conexion, $user['usuario_id'], $usuario, $dispo_unique_id, $ip_origen,
+        'LOGIN', 'tbl_usuario', $user['usuario_id'], 'EXITOSO', 
+        'Inicio de sesión exitoso');
+
+    // 8️⃣ Devolver datos del usuario (SIN la clave)
+        echo json_encode([
+            'exito' => true,
+            'mensaje' => 'Bienvenido, ' . $user['usuario_nombrecomp'],
+            'usuario' => [
+                'id'              => $user['usuario_id'],
+                'usuario'         => $user['usuario_nombre'],
+                'nombre_completo' => $user['usuario_nombrecomp'],
+                'correo'          => $user['usuario_correo'],
+                'telefono'        => $user['usuario_telefono'],
+                'empresa_id'      => $user['empresa_id']
+            ]
+        ], JSON_UNESCAPED_UNICODE);
+    }*/
 } 
 catch (Exception $e) 
 {
-    ob_clean();
     http_response_code(400);
     echo json_encode([
         'exito' => false,
@@ -143,6 +152,9 @@ catch (Exception $e)
     ], JSON_UNESCAPED_UNICODE);
 }
 
+/**
+ * Función auxiliar para registrar en la bitácora
+ */
 /*function registrarBitacora($conexion, $usuario_id, $nombre_usuario_temp, $dispo_unique_id, 
                           $ip_origen, $accion, $tabla_afectada, $registro_id, 
                           $estado_operacion, $mensaje_error = null) 
@@ -156,7 +168,7 @@ catch (Exception $e)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
 
-        if (!$stmt) return;
+        if (!$stmt) return; // Si falla, no interrumpimos el flujo principal
 
         mysqli_stmt_bind_param(
             $stmt, 
@@ -176,6 +188,7 @@ catch (Exception $e)
     } 
     catch (Exception $e) 
     {
+        // Silenciar error de bitácora para no afectar el login
         error_log("Error al registrar bitácora: " . $e->getMessage());
     }
 }*/
